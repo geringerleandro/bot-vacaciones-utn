@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 
 # ============================================================
@@ -53,11 +54,59 @@ def cargar_solicitudes():
                 "fecha_registro"  : campos[6]
             })
     return solicitudes
+
 # ============================================================
 # BLOQUE 2: FUNCIONES DE VALIDACIÓN
 # ============================================================
 
-# (próximo commit)
+def buscar_empleado(id_empleado, empleados):
+    """
+    Busca un empleado por su ID en la lista de empleados cargada.
+    Parámetros: id_empleado (int), empleados (list de dicts).
+    Retorna el diccionario del empleado si lo encuentra, o None si no existe.
+    """
+    for empleado in empleados:
+        if empleado["id_empleado"] == id_empleado:
+            return empleado
+    return None
+
+def valida_formato_fecha(texto):
+    """
+    Verifica que un string tenga formato de fecha válido (AAAA-MM-DD).
+    Retorna True si el formato es válido, False si no lo es.
+    """
+    try:
+        datetime.strptime(texto, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+def fecha_es_pasada(fecha_str):
+    """
+    Verifica si una fecha ya pasó respecto al día de hoy.
+    Retorna True si la fecha es anterior a hoy.
+    """
+    fecha = datetime.strptime(fecha_str, "%Y-%m-%d")
+    hoy = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+    return fecha < hoy
+
+def fin_anterior_a_inicio(inicio_str, fin_str):
+    """
+    Verifica si la fecha de fin es anterior o igual a la fecha de inicio.
+    Retorna True si el rango de fechas es inválido.
+    """
+    inicio = datetime.strptime(inicio_str, "%Y-%m-%d")
+    fin    = datetime.strptime(fin_str, "%Y-%m-%d")
+    return fin <= inicio
+
+def calcular_dias_solicitados(inicio_str, fin_str):
+    """
+    Calcula la cantidad de días corridos entre dos fechas.
+    Retorna un entero con la diferencia en días.
+    """
+    inicio = datetime.strptime(inicio_str, "%Y-%m-%d")
+    fin    = datetime.strptime(fin_str, "%Y-%m-%d")
+    return (fin - inicio).days
 
 # ============================================================
 # BLOQUE 3: FUNCIONES DE LÓGICA DE NEGOCIO

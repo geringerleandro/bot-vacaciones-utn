@@ -179,7 +179,7 @@ def generar_id_solicitud(solicitudes):
 def actualizar_saldo_empleado(empleado, dias_solicitados):
     """
     Resta los días aprobados del saldo disponible del empleado.
-    Modifica directamente el diccionario recibido (no retorna nada).
+    Modifica directamente el diccionario recibido.
     """
     empleado["saldo_dias_disponibles"] -= dias_solicitados
     return empleado

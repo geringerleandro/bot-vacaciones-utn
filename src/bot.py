@@ -26,6 +26,7 @@ def cargar_empleados():
     with open(RUTA_EMPLEADOS, "r", encoding="utf-8") as archivo:
         next(archivo) # Saltamos la línea de encabezados
         for linea in archivo:
+            if linea.strip() == "": continue
             campos = linea.strip().split(",")
             empleados.append({
                 "id_empleado"           : int(campos[0]),
@@ -43,6 +44,7 @@ def cargar_solicitudes():
     with open(RUTA_SOLICITUDES, "r", encoding="utf-8") as archivo:
         next(archivo) # Saltamos la línea de encabezados
         for linea in archivo:
+            if linea.strip() == "": continue
             campos = linea.strip().split(",")
             solicitudes.append({
                 "id_solicitud"    : int(campos[0]),
@@ -152,8 +154,11 @@ def hay_conflicto_fechas(id_empleado, fecha_inicio_str, fecha_fin_str, solicitud
             continue
         if solicitud["estado"] not in ("Aprobada", "Pendiente_RRHH"):
             continue
-        existente_inicio = datetime.strptime(solicitud["fecha_inicio"], "%Y-%m-%d")
-        existente_fin    = datetime.strptime(solicitud["fecha_fin"], "%Y-%m-%d")
+        try:
+            existente_inicio = datetime.strptime(solicitud["fecha_inicio"], "%Y-%m-%d")
+            existente_fin    = datetime.strptime(solicitud["fecha_fin"], "%Y-%m-%d")
+        except ValueError:
+            continue # Si el registro histórico está mal formateado, lo ignoramos para no romper el flujo
         if nuevo_inicio <= existente_fin and nuevo_fin >= existente_inicio:
             return True
     return False
@@ -177,6 +182,7 @@ def actualizar_saldo_empleado(empleado, dias_solicitados):
     Modifica directamente el diccionario recibido (no retorna nada).
     """
     empleado["saldo_dias_disponibles"] -= dias_solicitados
+    return empleado
 
 def registrar_solicitud(solicitudes, id_empleado, fecha_inicio, fecha_fin, dias_solicitados, estado):
     """
@@ -216,6 +222,8 @@ while estado_actual != "FINALIZADO":
         case "INICIO":
             try:
                 id_ingresado = int(input("Ingrese su ID de empleado: "))
+                if id_ingresado <= 0: 
+                    raise ValueError("El ID ingresado debe ser un número positivo.")
                 empleado_actual = buscar_empleado(id_ingresado, empleados)
                 if empleado_actual is None:
                     raise ValueError("No existe ningún empleado registrado con ese ID.")

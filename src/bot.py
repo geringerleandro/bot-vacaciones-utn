@@ -55,6 +55,25 @@ def cargar_solicitudes():
             })
     return solicitudes
 
+def guardar_empleados(empleados):
+    """
+    Sobrescribe el CSV de empleados con los datos actualizados (ej. saldo de días).
+    """
+    with open(RUTA_EMPLEADOS, "w", encoding="utf-8") as archivo:
+        archivo.write("id_empleado,nombre_completo,saldo_dias_disponibles\n")
+        for empleado in empleados:
+            archivo.write(f"{empleado['id_empleado']},{empleado['nombre_completo']},{empleado['saldo_dias_disponibles']}\n")
+
+def guardar_solicitudes(solicitudes):
+    """
+    Sobrescribe el CSV de solicitudes con el historial actualizado, incluyendo
+    las nuevas solicitudes registradas durante la ejecución del bot.
+    """
+    with open(RUTA_SOLICITUDES, "w", encoding="utf-8") as archivo:
+        archivo.write("id_solicitud,id_empleado,fecha_inicio,fecha_fin,dias_solicitados,estado,fecha_registro\n")
+        for solicitud in solicitudes:
+            archivo.write(f"{solicitud['id_solicitud']},{solicitud['id_empleado']},{solicitud['fecha_inicio']},{solicitud['fecha_fin']},{solicitud['dias_solicitados']},{solicitud['estado']},{solicitud['fecha_registro']}\n")
+
 # ============================================================
 # BLOQUE 2: FUNCIONES DE VALIDACIÓN
 # ============================================================
@@ -183,36 +202,52 @@ def registrar_solicitud(solicitudes, id_empleado, fecha_inicio, fecha_fin, dias_
 empleados   = cargar_empleados()
 solicitudes = cargar_solicitudes()
 
-estado_actual     = "INICIO"
-empleado_actual   = None
-fecha_inicio      = ""
-fecha_fin         = ""
-dias_solicitados  = 0
+estado_actual      = "INICIO"
+empleado_actual    = None
+fecha_inicio       = ""
+fecha_fin          = ""
+dias_solicitados   = 0
+intentos_invalidos = 0  # Cuenta errores consecutivos del usuario en el paso actual
 
 print("=== BOT DE SOLICITUD DE VACACIONES ===")
 
 while estado_actual != "FINALIZADO":
     match estado_actual:
         case "INICIO":
-            id_ingresado = input("Ingrese su ID de empleado: ")
-            id_ingresado = int(id_ingresado)
-            empleado_actual = buscar_empleado(id_ingresado, empleados)
-            if empleado_actual is None:
-                print("ERROR: No se encontró ningún empleado con ese ID.")
-            else:
+            try:
+                id_ingresado = int(input("Ingrese su ID de empleado: "))
+                empleado_actual = buscar_empleado(id_ingresado, empleados)
+                if empleado_actual is None:
+                    raise ValueError("No existe ningún empleado registrado con ese ID.")
                 print(f"Hola {empleado_actual['nombre_completo']}, tiene {empleado_actual['saldo_dias_disponibles']} días disponibles.")
+                intentos_invalidos = 0
                 estado_actual = "PIDIENDO_FECHAS"
+            except ValueError as e:
+                intentos_invalidos += 1
+                print(f"ERROR: {e}")
+                if intentos_invalidos >= MAX_INTENTOS:
+                    estado_actual = "DERIVADO_HUMANO"
 
         case "PIDIENDO_FECHAS":
             fecha_inicio = input("Ingrese la fecha de inicio deseada (AAAA-MM-DD): ")
             fecha_fin    = input("Ingrese la fecha de fin deseada (AAAA-MM-DD): ")
-            if fecha_es_pasada(fecha_inicio):
+
+            if not valida_formato_fecha(fecha_inicio) or not valida_formato_fecha(fecha_fin):
+                intentos_invalidos += 1
+                print("ERROR: El formato de fecha ingresado no es válido. Use AAAA-MM-DD.")
+            elif fecha_es_pasada(fecha_inicio):
+                intentos_invalidos += 1
                 print("ERROR: La fecha de inicio no puede ser anterior a hoy.")
             elif fin_anterior_a_inicio(fecha_inicio, fecha_fin):
+                intentos_invalidos += 1
                 print("ERROR: La fecha de fin debe ser posterior a la de inicio.")
             else:
                 dias_solicitados = calcular_dias_solicitados(fecha_inicio, fecha_fin)
+                intentos_invalidos = 0
                 estado_actual = "VALIDANDO_SALDO"
+
+            if intentos_invalidos >= MAX_INTENTOS:
+                estado_actual = "DERIVADO_HUMANO"
 
         case "VALIDANDO_SALDO":
             if saldo_insuficiente(empleado_actual, dias_solicitados):
@@ -224,8 +259,12 @@ while estado_actual != "FINALIZADO":
 
         case "VALIDANDO_CONFLICTO":
             if hay_conflicto_fechas(empleado_actual["id_empleado"], fecha_inicio, fecha_fin, solicitudes):
+                intentos_invalidos += 1
                 print("ERROR: Las fechas ingresadas se superponen con una licencia ya registrada.")
-                estado_actual = "PIDIENDO_FECHAS"
+                if intentos_invalidos >= MAX_INTENTOS:
+                    estado_actual = "DERIVADO_HUMANO"
+                else:
+                    estado_actual = "PIDIENDO_FECHAS"
             else:
                 estado_actual = "APROBANDO"
 
@@ -239,4 +278,10 @@ while estado_actual != "FINALIZADO":
                 print(f"Solicitud aprobada automáticamente. Nuevo saldo disponible: {empleado_actual['saldo_dias_disponibles']} días.")
             estado_actual = "FINALIZADO"
 
+        case "DERIVADO_HUMANO":
+            print("Se superó la cantidad máxima de intentos permitidos. Su consulta fue derivada a un agente de Recursos Humanos.")
+            estado_actual = "FINALIZADO"
+
+guardar_empleados(empleados)
+guardar_solicitudes(solicitudes)
 print("=== FIN DE LA SIMULACIÓN ===")

@@ -112,8 +112,69 @@ def calcular_dias_solicitados(inicio_str, fin_str):
 # BLOQUE 3: FUNCIONES DE LÓGICA DE NEGOCIO
 # ============================================================
 
-# (próximo commit)
+def saldo_insuficiente(empleado, dias_solicitados):
+    """
+    Verifica si el saldo disponible del empleado no alcanza los días solicitados.
+    Retorna True si el saldo es insuficiente.
+    """
+    return empleado["saldo_dias_disponibles"] < dias_solicitados
 
+def hay_conflicto_fechas(id_empleado, fecha_inicio_str, fecha_fin_str, solicitudes):
+    """
+    Verifica si el rango solicitado se superpone con alguna solicitud ya
+    registrada (aprobada o pendiente) del mismo empleado.
+    Retorna True si existe superposición de fechas.
+    """
+    nuevo_inicio = datetime.strptime(fecha_inicio_str, "%Y-%m-%d")
+    nuevo_fin    = datetime.strptime(fecha_fin_str, "%Y-%m-%d")
+    for solicitud in solicitudes:
+        # Solo nos interesan las solicitudes activas del mismo empleado
+        if solicitud["id_empleado"] != id_empleado:
+            continue
+        if solicitud["estado"] not in ("Aprobada", "Pendiente_RRHH"):
+            continue
+        existente_inicio = datetime.strptime(solicitud["fecha_inicio"], "%Y-%m-%d")
+        existente_fin    = datetime.strptime(solicitud["fecha_fin"], "%Y-%m-%d")
+        if nuevo_inicio <= existente_fin and nuevo_fin >= existente_inicio:
+            return True
+    return False
+
+def generar_id_solicitud(solicitudes):
+    """
+    Busca el ID más alto ya registrado y devuelve el siguiente disponible.
+    Retorna un entero con el nuevo ID de solicitud.
+    """
+    if len(solicitudes) == 0:
+        return 1
+    id_maximo = solicitudes[0]["id_solicitud"]
+    for solicitud in solicitudes:
+        if solicitud["id_solicitud"] > id_maximo:
+            id_maximo = solicitud["id_solicitud"]
+    return id_maximo + 1
+
+def actualizar_saldo_empleado(empleado, dias_solicitados):
+    """
+    Resta los días aprobados del saldo disponible del empleado.
+    Modifica directamente el diccionario recibido (no retorna nada).
+    """
+    empleado["saldo_dias_disponibles"] -= dias_solicitados
+
+def registrar_solicitud(solicitudes, id_empleado, fecha_inicio, fecha_fin, dias_solicitados, estado):
+    """
+    Crea el diccionario de la nueva solicitud y lo agrega a la lista.
+    Retorna el diccionario de la solicitud recién creada.
+    """
+    nueva_solicitud = {
+        "id_solicitud"    : generar_id_solicitud(solicitudes),
+        "id_empleado"     : id_empleado,
+        "fecha_inicio"    : fecha_inicio,
+        "fecha_fin"       : fecha_fin,
+        "dias_solicitados": dias_solicitados,
+        "estado"          : estado,
+        "fecha_registro"  : datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    solicitudes.append(nueva_solicitud)
+    return nueva_solicitud
 # ============================================================
 # BLOQUE 4: MÁQUINA DE ESTADOS Y FLUJO PRINCIPAL
 # ============================================================

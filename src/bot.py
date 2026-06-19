@@ -175,8 +175,68 @@ def registrar_solicitud(solicitudes, id_empleado, fecha_inicio, fecha_fin, dias_
     }
     solicitudes.append(nueva_solicitud)
     return nueva_solicitud
+
 # ============================================================
 # BLOQUE 4: MÁQUINA DE ESTADOS Y FLUJO PRINCIPAL
 # ============================================================
 
-# (próximo commit)
+empleados   = cargar_empleados()
+solicitudes = cargar_solicitudes()
+
+estado_actual     = "INICIO"
+empleado_actual   = None
+fecha_inicio      = ""
+fecha_fin         = ""
+dias_solicitados  = 0
+
+print("=== BOT DE SOLICITUD DE VACACIONES ===")
+
+while estado_actual != "FINALIZADO":
+    match estado_actual:
+        case "INICIO":
+            id_ingresado = input("Ingrese su ID de empleado: ")
+            id_ingresado = int(id_ingresado)
+            empleado_actual = buscar_empleado(id_ingresado, empleados)
+            if empleado_actual is None:
+                print("ERROR: No se encontró ningún empleado con ese ID.")
+            else:
+                print(f"Hola {empleado_actual['nombre_completo']}, tiene {empleado_actual['saldo_dias_disponibles']} días disponibles.")
+                estado_actual = "PIDIENDO_FECHAS"
+
+        case "PIDIENDO_FECHAS":
+            fecha_inicio = input("Ingrese la fecha de inicio deseada (AAAA-MM-DD): ")
+            fecha_fin    = input("Ingrese la fecha de fin deseada (AAAA-MM-DD): ")
+            if fecha_es_pasada(fecha_inicio):
+                print("ERROR: La fecha de inicio no puede ser anterior a hoy.")
+            elif fin_anterior_a_inicio(fecha_inicio, fecha_fin):
+                print("ERROR: La fecha de fin debe ser posterior a la de inicio.")
+            else:
+                dias_solicitados = calcular_dias_solicitados(fecha_inicio, fecha_fin)
+                estado_actual = "VALIDANDO_SALDO"
+
+        case "VALIDANDO_SALDO":
+            if saldo_insuficiente(empleado_actual, dias_solicitados):
+                print(f"ERROR: Saldo insuficiente. Disponible: {empleado_actual['saldo_dias_disponibles']} días, solicitados: {dias_solicitados}.")
+                registrar_solicitud(solicitudes, empleado_actual["id_empleado"], fecha_inicio, fecha_fin, dias_solicitados, "Cancelada")
+                estado_actual = "FINALIZADO"
+            else:
+                estado_actual = "VALIDANDO_CONFLICTO"
+
+        case "VALIDANDO_CONFLICTO":
+            if hay_conflicto_fechas(empleado_actual["id_empleado"], fecha_inicio, fecha_fin, solicitudes):
+                print("ERROR: Las fechas ingresadas se superponen con una licencia ya registrada.")
+                estado_actual = "PIDIENDO_FECHAS"
+            else:
+                estado_actual = "APROBANDO"
+
+        case "APROBANDO":
+            if dias_solicitados > UMBRAL_DIAS:
+                registrar_solicitud(solicitudes, empleado_actual["id_empleado"], fecha_inicio, fecha_fin, dias_solicitados, "Pendiente_RRHH")
+                print(f"Su solicitud de {dias_solicitados} días supera el umbral de aprobación automática. Fue derivada a RRHH.")
+            else:
+                registrar_solicitud(solicitudes, empleado_actual["id_empleado"], fecha_inicio, fecha_fin, dias_solicitados, "Aprobada")
+                actualizar_saldo_empleado(empleado_actual, dias_solicitados)
+                print(f"Solicitud aprobada automáticamente. Nuevo saldo disponible: {empleado_actual['saldo_dias_disponibles']} días.")
+            estado_actual = "FINALIZADO"
+
+print("=== FIN DE LA SIMULACIÓN ===")
